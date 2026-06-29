@@ -5,8 +5,9 @@
       "title": "Arquitectura de Software",
       "description": "35 conceptos clave: SWEBOK, patrones de diseño (GoF), DevOps, servidores, teorema CAP, SOLID, microservicios y más.",
       "category": "Software",
+      "language": "Español",
+      "media": [],
       "tags": ["software", "arquitectura", "patrones", "devops", "swebok"],
-      "language": "es",
       "cards": 35,
       "file": "arquitectura-software.apkg",
       "bytes": 4212
