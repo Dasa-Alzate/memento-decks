@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Memento · Mazos</title>
+  <style>
+    :root {
+      --bg: #0f1216; --surface: #171c24; --surface2: #1e2530; --border: #2a3340;
+      --text: #eef2f7; --muted: #9aa6b6; --accent: #3b6fed; --accent2: #2e9e6b;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    }
+    header { padding: 20px 16px 8px; }
+    h1 { margin: 0 0 2px; font-size: 22px; letter-spacing: .2px; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .controls { padding: 8px 16px 4px; display: flex; flex-direction: column; gap: 10px; position: sticky; top: 0; background: var(--bg); z-index: 5; }
+    input[type=search] {
+      width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); font-size: 16px; outline: none;
+    }
+    input[type=search]:focus { border-color: var(--accent); }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      padding: 7px 13px; border-radius: 999px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-size: 13px; cursor: pointer; user-select: none;
+    }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .count { color: var(--muted); font-size: 12px; padding: 4px 16px 0; }
+    main { padding: 8px 16px 40px; display: grid; gap: 12px; grid-template-columns: 1fr; }
+    @media (min-width: 640px) { main { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 1000px) { main { grid-template-columns: 1fr 1fr 1fr; } }
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 16px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .card h2 { margin: 0; font-size: 17px; }
+    .badge { align-self: flex-start; font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--surface2); color: var(--muted); }
+    .desc { color: var(--muted); font-size: 14px; line-height: 1.45; flex: 1; }
+    .meta { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tag { font-size: 11px; color: var(--muted); background: var(--surface2); padding: 2px 8px; border-radius: 6px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+    .info { color: var(--muted); font-size: 12px; }
+    a.dl {
+      text-decoration: none; background: var(--accent); color: #fff; font-weight: 600;
+      padding: 10px 16px; border-radius: 10px; font-size: 14px; white-space: nowrap;
+    }
+    a.dl:active { opacity: .85; }
+    .empty, .error { color: var(--muted); padding: 40px 16px; text-align: center; }
+    .hint { margin: 4px 16px 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .hint b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Memento · Mazos</h1>
+    <div class="sub">Descarga un mazo e impórtalo en la app: <b>Ajustes → Datos → Elegir archivo .apkg</b></div>
+  </header>
+
+  <div class="hint" id="hint">Cargando…</div>
+
+  <div class="controls">
+    <input type="search" id="q" placeholder="Buscar por título, descripción o etiqueta…" autocomplete="off" />
+    <div class="chips" id="cats"></div>
+  </div>
+  <div class="count" id="count"></div>
+
+  <main id="grid"></main>
+
+  <script>
+    const fmtBytes = (n) => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(0) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+    let decks = [];
+    let base = 'decks/';
+    let cat = 'Todas';
+    let q = '';
+
+    function categories() {
+      return ['Todas', ...Array.from(new Set(decks.map((d) => d.category))).sort()];
+    }
+    function matches(d) {
+      if (cat !== 'Todas' && d.category !== cat) return false;
+      if (!q) return true;
+      const hay = (d.title + ' ' + d.description + ' ' + (d.tags || []).join(' ')).toLowerCase();
+      return hay.includes(q);
+    }
+    function render() {
+      const cats = document.getElementById('cats');
+      cats.innerHTML = '';
+      for (const c of categories()) {
+        const el = document.createElement('div');
+        el.className = 'chip' + (c === cat ? ' active' : '');
+        el.textContent = c;
+        el.onclick = () => { cat = c; render(); };
+        cats.appendChild(el);
+      }
+      const list = decks.filter(matches);
+      document.getElementById('count').textContent = list.length + (list.length === 1 ? ' mazo' : ' mazos');
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      if (list.length === 0) {
+        grid.innerHTML = '<div class="empty">Sin resultados.</div>';
+        return;
+      }
+      for (const d of list) {
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.innerHTML =
+          '<span class="badge">' + d.category + '</span>' +
+          '<h2>' + d.title + '</h2>' +
+          '<p class="desc">' + d.description + '</p>' +
+          '<div class="meta">' + (d.tags || []).map((t) => '<span class="tag">' + t + '</span>').join('') + '</div>' +
+          '<div class="row"><span class="info">' + d.cards + ' cartas · ' + fmtBytes(d.bytes) + '</span>' +
+          '<a class="dl" href="' + base + d.file + '" download>Descargar</a></div>';
+        grid.appendChild(card);
+      }
+    }
+
+    document.getElementById('q').addEventListener('input', (e) => { q = e.target.value.trim().toLowerCase(); render(); });
+
+    async function load() {
+      for (const b of ['decks/', '../decks/']) {
+        try {
+          const r = await fetch(b + 'index.json', { cache: 'no-store' });
+          if (r.ok) { base = b; return (await r.json()).decks || []; }
+        } catch (e) { /* siguiente */ }
+      }
+      throw new Error('no manifest');
+    }
+    load()
+      .then((list) => {
+        decks = list;
+        document.getElementById('hint').innerHTML = '<b>' + decks.length + '</b> mazos disponibles. Toca <b>Descargar</b> y luego impórtalo desde la app.';
+        render();
+      })
+      .catch(() => {
+        document.getElementById('hint').classList.add('error');
+        document.getElementById('hint').textContent = 'No pude cargar la lista. Sirve el repo por HTTP (no abras el archivo directamente).';
+      });
+  </script>
+</body>
+</html>
